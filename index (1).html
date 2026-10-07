@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ヤキニク セルン ご予約</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{--main:#ee7d1a;--main-d:#c9620a;--ink:#222;--sub:#777;--line:#e6e6e6;--bg:#fff8f1;--ng:#bbb}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}
+  header{background:var(--main);color:#fff;padding:16px;text-align:center}
+  header h1{margin:0;font-size:20px;letter-spacing:.05em}
+  header p{margin:4px 0 0;font-size:12px;opacity:.9}
+  main{padding:12px 16px 120px;max-width:480px;margin:0 auto}
+  .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .card h2{margin:0 0 10px;font-size:15px}
+  .card h2 small{font-weight:normal;color:var(--sub);font-size:12px;margin-left:6px}
+  .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .cal-head button{border:0;background:none;font-size:20px;color:var(--main);padding:4px 10px}
+  .cal-head button:disabled{color:var(--ng)}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+  .cal .w{font-size:11px;color:var(--sub)}
+  .cal .w.sun,.cal .d.sun{color:#d33}.cal .w.sat,.cal .d.sat{color:#2a6fd1}
+  .cal .d{padding:9px 0;border-radius:8px;font-size:14px;border:1px solid transparent}
+  .cal .d.ok{background:#fff3e6;cursor:pointer}
+  .cal .d.off{color:var(--ng)!important;background:#f5f5f5}
+  .cal .d.closed{color:var(--ng)!important;background:#f5f5f5;text-decoration:line-through}
+  .cal .d.sel{background:var(--main);color:#fff!important}
+  .grid{display:grid;gap:8px}
+  .g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g6{grid-template-columns:repeat(6,1fr)}
+  .opt{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 0;font-size:14px;text-align:center;cursor:pointer;color:var(--ink)}
+  .opt.sel{background:var(--main);border-color:var(--main);color:#fff;font-weight:bold}
+  .note{font-size:12px;color:var(--sub);margin-top:8px}
+  .warn{background:#fff3e6;border-left:4px solid var(--main);padding:10px;border-radius:6px;font-size:13px;margin-top:10px}
+  label{display:block;font-size:13px;margin:8px 0 4px}
+  input,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;font-family:inherit}
+  textarea{height:70px}
+  .hello{font-size:15px}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -2px 8px rgba(0,0,0,.08)}
+  .bar .sum{font-size:12px;color:var(--sub);text-align:center;margin-bottom:6px;min-height:16px}
+  .btn{display:block;width:100%;max-width:480px;margin:0 auto;border:0;border-radius:24px;padding:14px;font-size:16px;font-weight:bold;background:var(--main);color:#fff}
+  .btn:disabled{background:var(--ng)}
+  .center{text-align:center;padding:40px 16px}
+  .done h2{color:var(--main)}
+  .tel{color:var(--main);font-weight:bold}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>ヤキニク セルン</h1>
+  <p>LINEかんたん予約</p>
+</header>
+
+<div id="loading" class="center">読み込み中…</div>
+<div id="error" class="center hide"></div>
+
+<main id="form" class="hide">
+  <div class="card">
+    <h2>ご来店日<small>2日前まで受付</small></h2>
+    <div class="cal-head">
+      <button id="prev">‹</button><b id="month"></b><button id="next">›</button>
+    </div>
+    <div class="cal" id="cal"></div>
+    <div id="weekendNote" class="warn hide"></div>
+    <div class="note">前日・当日のご予約は<span class="tel js-tel">お電話</span>でお願いします</div>
+  </div>
+
+  <div class="card">
+    <h2>時間</h2>
+    <div class="grid g4" id="slots"></div>
+  </div>
+
+  <div class="card">
+    <h2>人数</h2>
+    <div class="grid g6" id="people"></div>
+    <div class="note"><span id="maxP"></span>名以上のご予約は<span class="tel js-tel">お電話</span>でお願いします</div>
+  </div>
+
+  <div class="card">
+    <h2>お席のご希望</h2>
+    <div class="grid g3" id="seat"></div>
+    <div class="note">ご希望に添えない場合もございます</div>
+  </div>
+
+  <div class="card" id="newUser">
+    <h2>お客様情報<small>初回のみ</small></h2>
+    <label>お名前</label>
+    <input id="name" autocomplete="name" placeholder="例）セルン 太郎">
+    <label>電話番号</label>
+    <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="例）09012345678">
+  </div>
+  <div class="card hide" id="knownUser"><div class="hello"><b id="knownName"></b> 様、いつもありがとうございます。</div></div>
+
+  <div class="card">
+    <h2>ご要望<small>任意</small></h2>
+    <textarea id="note" maxlength="200" placeholder="お子様連れ、記念日など"></textarea>
+  </div>
+</main>
+
+<div id="done" class="center done hide">
+  <h2>ご予約を受け付けました</h2>
+  <p id="doneText"></p>
+  <p class="note">変更・キャンセルは<span class="tel js-tel">お電話</span>でお願いします</p>
+  <button class="btn" id="closeBtn" style="margin-top:24px">閉じる</button>
+</div>
+
+<div class="bar hide" id="bar">
+  <div class="sum" id="sum"></div>
+  <button class="btn" id="submit" disabled>この内容で予約する</button>
+</div>
+
+<script>
+const LIFF_ID = 'ここにLIFF ID';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxUFZ-BWEUNmgomLOvinJuIaqZrqg_Tm8n4C6FuKO_lX2scaDYwS4eUrTwdBkEYmL5YKg/exec';
+const SHOP_TEL = '078-927-0021';
+
+const $ = id => document.getElementById(id);
+const WEEK = ['日','月','火','水','木','金','土'];
+const S = { date:null, time:null, people:null, seat:null };
+let D = null, idToken = null, monthIdx = 0, months = [];
+
+async function api(body){
+  const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(Object.assign({idToken}, body)) });
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error || 'エラーが発生しました');
+  return j;
+}
+
+function showError(msg){
+  $('loading').classList.add('hide');
+  $('error').classList.remove('hide');
+  $('error').innerHTML = msg + (SHOP_TEL ? `<br><br>お電話：<a class="tel" href="tel:${SHOP_TEL}">${SHOP_TEL}</a>` : '');
+}
+
+function setTel(){
+  document.querySelectorAll('.js-tel').forEach(el=>{
+    if(SHOP_TEL){ el.innerHTML = `お電話（<a class="tel" href="tel:${SHOP_TEL}">${SHOP_TEL}</a>）`; }
+  });
+}
+
+function renderCal(){
+  const [y,m] = months[monthIdx];
+  $('month').textContent = `${y}年${m}月`;
+  $('prev').disabled = monthIdx===0;
+  $('next').disabled = monthIdx===months.length-1;
+  const map = {}; D.days.forEach(d=>map[d.date]=d);
+  const first = new Date(y,m-1,1), last = new Date(y,m,0).getDate();
+  let html = WEEK.map((w,i)=>`<div class="w ${i===0?'sun':i===6?'sat':''}">${w}</div>`).join('');
+  for(let i=0;i<first.getDay();i++) html += '<div></div>';
+  for(let d=1; d<=last; d++){
+    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const info = map[key], dow = new Date(y,m-1,d).getDay();
+    let cls = 'd ' + (dow===0||(info&&info.holiday)?'sun':dow===6?'sat':'');
+    if(!info) cls += ' off'; else if(info.closed) cls += ' closed'; else cls += ' ok';
+    if(S.date===key) cls += ' sel';
+    html += `<div class="${cls}" data-date="${info&&!info.closed?key:''}">${d}</div>`;
+  }
+  $('cal').innerHTML = html;
+}
+
+function opts(el, list, key, fmt){
+  el.innerHTML = list.map(v=>`<div class="opt" data-v="${v}">${fmt?fmt(v):v}</div>`).join('');
+  el.onclick = e=>{
+    const t = e.target.closest('.opt'); if(!t) return;
+    S[key] = isNaN(t.dataset.v) || key!=='people' ? t.dataset.v : Number(t.dataset.v);
+    [...el.children].forEach(c=>c.classList.toggle('sel', c===t));
+    update();
+  };
+}
+
+function update(){
+  const day = S.date && D.days.find(d=>d.date===S.date);
+  $('weekendNote').classList.toggle('hide', !(day && day.limited));
+  $('weekendNote').textContent = D.weekendNote;
+  const parts = [];
+  if(S.date){ const d=new Date(S.date.replace(/-/g,'/')); parts.push(`${d.getMonth()+1}/${d.getDate()}(${WEEK[d.getDay()]})`); }
+  if(S.time) parts.push(S.time);
+  if(S.people) parts.push(S.people+'名');
+  if(S.seat) parts.push(S.seat);
+  $('sum').textContent = parts.join(' ・ ');
+  const userOk = D.customer || ($('name').value.trim() && $('phone').value.replace(/\D/g,'').length>=10);
+  $('submit').disabled = !(S.date && S.time && S.people && S.seat && userOk);
+}
+
+async function submit(){
+  const btn = $('submit');
+  btn.disabled = true; btn.textContent = '送信中…';
+  try{
+    const r = await api({ action:'reserve', date:S.date, time:S.time, people:S.people, seat:S.seat,
+      name:$('name').value, phone:$('phone').value, note:$('note').value });
+    const d = new Date(S.date.replace(/-/g,'/'));
+    const when = `${d.getMonth()+1}月${d.getDate()}日(${WEEK[d.getDay()]}) ${S.time}`;
+    const lines = ['【ご予約】', `${r.name} 様`, when, `${S.people}名・${S.seat}`];
+    if($('note').value.trim()) lines.push('ご要望：'+$('note').value.trim());
+    if(r.limited) lines.push('※'+r.weekendNote);
+    // お店のLINE公式アカウントに予約内容を送る（通数を消費しない）
+    try{ if(liff.isInClient()) await liff.sendMessages([{type:'text', text:lines.join('\n')}]); }catch(e){}
+    $('form').classList.add('hide'); $('bar').classList.add('hide');
+    $('done').classList.remove('hide');
+    $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名・${S.seat}` + (r.limited?`<br><br><span class="note">${r.weekendNote}</span>`:'');
+    window.scrollTo(0,0);
+  }catch(e){
+    alert(e.message);
+    btn.disabled = false; btn.textContent = 'この内容で予約する';
+  }
+}
+
+async function main(){
+  setTel();
+  try{
+    await liff.init({ liffId: LIFF_ID });
+    if(!liff.isLoggedIn()){ liff.login({ redirectUri: location.href }); return; }
+    idToken = liff.getIDToken();
+    D = await api({ action:'init' });
+  }catch(e){ showError('読み込みに失敗しました。<br>LINEアプリから開き直してください。<br><span class="note">'+e.message+'</span>'); return; }
+
+  const seen = new Set();
+  D.days.forEach(d=>{ const [y,m]=d.date.split('-').map(Number); const k=y+'-'+m; if(!seen.has(k)){seen.add(k); months.push([y,m]);} });
+  if(!months.length){ showError('現在ネット予約を受け付けていません。'); return; }
+  renderCal();
+  $('prev').onclick = ()=>{ monthIdx--; renderCal(); };
+  $('next').onclick = ()=>{ monthIdx++; renderCal(); };
+  $('cal').onclick = e=>{ const t=e.target.closest('.d'); if(!t||!t.dataset.date) return; S.date=t.dataset.date; renderCal(); update(); };
+
+  opts($('slots'), D.slots, 'time');
+  $('maxP').textContent = D.maxPeople + 1;
+  opts($('people'), Array.from({length:D.maxPeople},(_,i)=>i+1), 'people');
+  opts($('seat'), ['座敷','イス','希望なし'], 'seat');
+
+  if(D.customer){ $('newUser').classList.add('hide'); $('knownUser').classList.remove('hide'); $('knownName').textContent = D.customer.name; }
+  ['name','phone'].forEach(id=>$(id).addEventListener('input', update));
+  $('submit').onclick = submit;
+  $('closeBtn').onclick = ()=>{ if(liff.isInClient()) liff.closeWindow(); else window.close(); };
+
+  $('loading').classList.add('hide');
+  $('form').classList.remove('hide');
+  $('bar').classList.remove('hide');
+}
+main();
+</script>
+</body>
+</html>
