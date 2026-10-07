@@ -44,6 +44,13 @@
   .center{text-align:center;padding:40px 16px}
   .done h2{color:var(--main)}
   .tel{color:var(--main);font-weight:bold}
+  .kid{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+  .kid:last-of-type{border-bottom:0}
+  .kid span small{display:block;color:var(--sub);font-size:11px}
+  .step{display:flex;align-items:center;gap:12px}
+  .step button{width:36px;height:36px;border-radius:50%;border:1px solid var(--main);background:#fff;color:var(--main);font-size:20px;line-height:1}
+  .step button:disabled{border-color:var(--line);color:var(--ng)}
+  .step b{min-width:20px;text-align:center;font-size:16px}
   .hide{display:none!important}
 </style>
 </head>
@@ -76,6 +83,13 @@
     <h2>人数</h2>
     <div class="grid g6" id="people"></div>
     <div class="note"><span id="maxP"></span>名以上のご予約は<span class="tel js-tel">お電話</span>でお願いします</div>
+  </div>
+
+  <div class="card">
+    <h2>お子様<small>上の人数のうち（いなければ0のまま）</small></h2>
+    <div class="kid"><span>小学校低学年</span><div class="step" data-k="kidsLow"><button>−</button><b>0</b><button>＋</button></div></div>
+    <div class="kid"><span>幼児<small>未就学のお子様</small></span><div class="step" data-k="kidsInfant"><button>−</button><b>0</b><button>＋</button></div></div>
+    <div class="kid"><span>赤ちゃん<small>1歳くらいまで</small></span><div class="step" data-k="kidsBaby"><button>−</button><b>0</b><button>＋</button></div></div>
   </div>
 
   <div class="card">
@@ -118,7 +132,26 @@ const SHOP_TEL = '078-927-0021';
 
 const $ = id => document.getElementById(id);
 const WEEK = ['日','月','火','水','木','金','土'];
-const S = { date:null, time:null, people:null, seat:null };
+const S = { date:null, time:null, people:null, seat:null, kidsLow:0, kidsInfant:0, kidsBaby:0 };
+const kidsSum = () => S.kidsLow + S.kidsInfant + S.kidsBaby;
+function kidsText(){
+  const p = [];
+  if(S.kidsLow) p.push('小学低学年'+S.kidsLow);
+  if(S.kidsInfant) p.push('幼児'+S.kidsInfant);
+  if(S.kidsBaby) p.push('赤ちゃん'+S.kidsBaby);
+  return p.length ? '（うち '+p.join('・')+'）' : '';
+}
+function renderKids(){
+  const max = S.people ? S.people - 1 : 0;
+  // 人数を減らした時は子どもの数を合わせて減らす
+  ['kidsBaby','kidsInfant','kidsLow'].forEach(k=>{ while(kidsSum() > max && S[k] > 0) S[k]--; });
+  document.querySelectorAll('.step').forEach(el=>{
+    const k = el.dataset.k, [minus, plus] = el.querySelectorAll('button');
+    el.querySelector('b').textContent = S[k];
+    minus.disabled = S[k] <= 0;
+    plus.disabled = kidsSum() >= max;
+  });
+}
 let D = null, idToken = null, monthIdx = 0, months = [];
 
 // 送信ID：通信が不安定で再送しても予約が二重にならないようにする
@@ -188,13 +221,14 @@ function opts(el, list, key, fmt){
 }
 
 function update(){
+  renderKids();
   const day = S.date && D.days.find(d=>d.date===S.date);
   $('weekendNote').classList.toggle('hide', !(day && day.limited));
   $('weekendNote').textContent = D.weekendNote;
   const parts = [];
   if(S.date){ const d=new Date(S.date.replace(/-/g,'/')); parts.push(`${d.getMonth()+1}/${d.getDate()}(${WEEK[d.getDay()]})`); }
   if(S.time) parts.push(S.time);
-  if(S.people) parts.push(S.people+'名');
+  if(S.people) parts.push(S.people+'名'+kidsText());
   if(S.seat) parts.push(S.seat);
   $('sum').textContent = parts.join(' ・ ');
   const userOk = D.customer || ($('name').value.trim() && $('phone').value.replace(/\D/g,'').length>=10);
@@ -206,17 +240,13 @@ async function submit(){
   btn.disabled = true; btn.textContent = '送信中…';
   try{
     const r = await api({ action:'reserve', date:S.date, time:S.time, people:S.people, seat:S.seat,
+      kidsLow:S.kidsLow, kidsInfant:S.kidsInfant, kidsBaby:S.kidsBaby,
       name:$('name').value, phone:$('phone').value, note:$('note').value });
     const d = new Date(S.date.replace(/-/g,'/'));
     const when = `${d.getMonth()+1}月${d.getDate()}日(${WEEK[d.getDay()]}) ${S.time}`;
-    const lines = ['【ご予約】', `${r.name} 様`, when, `${S.people}名・${S.seat}`];
-    if($('note').value.trim()) lines.push('ご要望：'+$('note').value.trim());
-    if(r.limited) lines.push('※'+r.weekendNote);
-    // お店のLINE公式アカウントに予約内容を送る（通数を消費しない）
-    try{ if(liff.isInClient()) await liff.sendMessages([{type:'text', text:lines.join('\n')}]); }catch(e){}
     $('form').classList.add('hide'); $('bar').classList.add('hide');
     $('done').classList.remove('hide');
-    $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名・${S.seat}` + (r.limited?`<br><br><span class="note">${r.weekendNote}</span>`:'');
+    $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名${kidsText()}・${S.seat}` + (r.limited?`<br><br><span class="note">${r.weekendNote}</span>`:'');
     window.scrollTo(0,0);
   }catch(e){
     alert(e.message);
@@ -245,6 +275,12 @@ async function main(){
   $('maxP').textContent = D.maxPeople + 1;
   opts($('people'), Array.from({length:D.maxPeople},(_,i)=>i+1), 'people');
   opts($('seat'), ['座敷','イス','希望なし'], 'seat');
+  document.querySelectorAll('.step').forEach(el=>{
+    const k = el.dataset.k, [minus, plus] = el.querySelectorAll('button');
+    minus.onclick = ()=>{ if(S[k]>0){ S[k]--; update(); } };
+    plus.onclick = ()=>{ if(S.people && kidsSum() < S.people-1){ S[k]++; update(); } };
+  });
+  renderKids();
 
   if(D.customer){ $('newUser').classList.add('hide'); $('knownUser').classList.remove('hide'); $('knownName').textContent = D.customer.name; }
   ['name','phone'].forEach(id=>$(id).addEventListener('input', update));
