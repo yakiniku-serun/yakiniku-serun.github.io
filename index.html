@@ -77,6 +77,10 @@
   <div class="card">
     <h2>時間</h2>
     <div class="grid g4" id="slots"></div>
+    <div id="planBox" class="hide" style="margin-top:12px">
+      <div class="note" style="margin:0 0 6px">ご利用時間をお選びください</div>
+      <div class="grid" style="grid-template-columns:1fr" id="plan"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -132,7 +136,7 @@ const SHOP_TEL = '078-927-0021';
 
 const $ = id => document.getElementById(id);
 const WEEK = ['日','月','火','水','木','金','土'];
-const S = { date:null, time:null, people:null, seat:null, kidsLow:0, kidsInfant:0, kidsBaby:0 };
+const S = { date:null, time:null, people:null, seat:null, kidsLow:0, kidsInfant:0, kidsBaby:0, plan:'' };
 const kidsSum = () => S.kidsLow + S.kidsInfant + S.kidsBaby;
 function kidsText(){
   const p = [];
@@ -227,17 +231,33 @@ function endTime(t, min){
 const limitLabel = () => (D.limitMin/60) + '時間';
 const freeHour = () => Number((D.freeFrom||'19:00').split(':')[0]);
 const timeLimited = (day, t) => !!(day && day.limited && t && t < (D.freeFrom||'19:00'));
+const drinkOk = (day, t) => timeLimited(day, t) && t <= (D.drinkUntil||'18:30');
+const useMin = () => S.plan === '1h' ? 60 : D.limitMin;
+const useLabel = () => S.plan === '1h' ? '1時間' : limitLabel();
+function renderPlan(day){
+  const ok = drinkOk(day, S.time);
+  $('planBox').classList.toggle('hide', !ok);
+  if(!ok){ S.plan = ''; return; }
+  const items = [
+    { v:'', t:`${limitLabel()}（${S.time}〜${endTime(S.time, D.limitMin)}）` },
+    { v:'1h', t:`1時間でご退席（${S.time}〜${endTime(S.time, 60)}）<br><small>1名様分のドリンク無料</small>` },
+  ];
+  $('plan').innerHTML = items.map(i=>`<div class="opt ${S.plan===i.v?'sel':''}" data-p="${i.v}">${i.t}</div>`).join('');
+  $('plan').onclick = e=>{ const t=e.target.closest('.opt'); if(!t) return; S.plan=t.dataset.p; update(); };
+}
 function update(){
   renderKids();
   const day = S.date && D.days.find(d=>d.date===S.date);
   $('weekendNote').classList.toggle('hide', !(day && day.limited));
-  const base = `土日祝はお席のご利用時間を<b>${limitLabel()}</b>でご協力をお願いしております。${freeHour()}時以降のご入店の場合、時間制限はございません。`;
+  const dk = (D.drinkUntil||'18:30');
+  const base = `土日祝はお席のご利用時間を<b>${limitLabel()}</b>でご協力をお願いしております。${freeHour()}時以降のご入店の場合、時間制限はございません。<br>🍺 ${dk}までのご入店で<b>1時間以内にご退席</b>いただくと、<b>1名様分のドリンクが無料</b>になります。`;
+  renderPlan(day);
   $('weekendNote').innerHTML = !S.time ? base
-    : timeLimited(day, S.time) ? base + `<br>ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）`
+    : timeLimited(day, S.time) ? base + `<br>ご利用時間：<b>${S.time}〜${endTime(S.time, useMin())}</b>（${useLabel()}${S.plan==='1h'?'・ドリンク1杯サービス':'制'}）`
     : `${freeHour()}時以降のご入店のため、<b>時間制限はございません</b>。`;
   const parts = [];
   if(S.date){ const d=new Date(S.date.replace(/-/g,'/')); parts.push(`${d.getMonth()+1}/${d.getDate()}(${WEEK[d.getDay()]})`); }
-  if(S.time) parts.push(timeLimited(day, S.time) ? `${S.time}〜${endTime(S.time, D.limitMin)}（${limitLabel()}制）` : S.time);
+  if(S.time) parts.push(timeLimited(day, S.time) ? `${S.time}〜${endTime(S.time, useMin())}（${useLabel()}${S.plan==='1h'?'・🍺サービス':'制'}）` : S.time);
   if(S.people) parts.push(S.people+'名'+kidsText());
   if(S.seat) parts.push(S.seat);
   $('sum').textContent = parts.join(' ・ ');
@@ -250,13 +270,14 @@ async function submit(){
   btn.disabled = true; btn.textContent = '送信中…';
   try{
     const r = await api({ action:'reserve', date:S.date, time:S.time, people:S.people, seat:S.seat,
-      kidsLow:S.kidsLow, kidsInfant:S.kidsInfant, kidsBaby:S.kidsBaby,
+      kidsLow:S.kidsLow, kidsInfant:S.kidsInfant, kidsBaby:S.kidsBaby, plan:S.plan,
       name:$('name').value, phone:$('phone').value, note:$('note').value });
     const d = new Date(S.date.replace(/-/g,'/'));
     const when = `${d.getMonth()+1}月${d.getDate()}日(${WEEK[d.getDay()]}) ${S.time}`;
     $('form').classList.add('hide'); $('bar').classList.add('hide');
     $('done').classList.remove('hide');
-    $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名${kidsText()}・${S.seat}` + (r.limited?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）<br>ご協力をお願いいたします</span>`:'');
+    $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名${kidsText()}・${S.seat}` + (r.oneHour?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, 60)}</b>（1時間）<br>1時間以内のご退席で1名様分のドリンクが無料になります</span>`
+      : r.limited?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）<br>ご協力をお願いいたします</span>`:'');
     window.scrollTo(0,0);
   }catch(e){
     alert(e.message);
