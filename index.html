@@ -92,8 +92,8 @@
   <div class="card">
     <h2>お子様<small>上の人数のうち（いなければ0のまま）</small></h2>
     <div class="kid"><span>小学校低学年</span><div class="step" data-k="kidsLow"><button>−</button><b>0</b><button>＋</button></div></div>
-    <div class="kid"><span>幼児<small>未就学のお子様</small></span><div class="step" data-k="kidsInfant"><button>−</button><b>0</b><button>＋</button></div></div>
-    <div class="kid"><span>赤ちゃん<small>1歳くらいまで</small></span><div class="step" data-k="kidsBaby"><button>−</button><b>0</b><button>＋</button></div></div>
+    <div class="kid"><span>幼児<small>1歳〜未就学のお子様</small></span><div class="step" data-k="kidsInfant"><button>−</button><b>0</b><button>＋</button></div></div>
+    <div class="kid"><span>乳児<small>1歳未満</small></span><div class="step" data-k="kidsBaby"><button>−</button><b>0</b><button>＋</button></div></div>
   </div>
 
   <div class="card">
@@ -142,7 +142,7 @@ function kidsText(){
   const p = [];
   if(S.kidsLow) p.push('小学低学年'+S.kidsLow);
   if(S.kidsInfant) p.push('幼児'+S.kidsInfant);
-  if(S.kidsBaby) p.push('赤ちゃん'+S.kidsBaby);
+  if(S.kidsBaby) p.push('乳児'+S.kidsBaby);
   return p.length ? '（うち '+p.join('・')+'）' : '';
 }
 function renderKids(){
