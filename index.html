@@ -272,12 +272,21 @@ async function submit(){
     const r = await api({ action:'reserve', date:S.date, time:S.time, people:S.people, seat:S.seat,
       kidsLow:S.kidsLow, kidsInfant:S.kidsInfant, kidsBaby:S.kidsBaby, plan:S.plan,
       name:$('name').value, phone:$('phone').value, note:$('note').value });
+    // 予約内容をLINEのトークに残す（トークから開いた時は無料で送れる。送れない時はお店から送る）
+    let sentToTalk = false;
+    if(r.confirmText && liff.isInClient()){
+      try{ await liff.sendMessages([{ type:'text', text:r.confirmText }]); sentToTalk = true; }catch(_){}
+    }
+    if(!sentToTalk){
+      try{ await api({ action:'confirm', reservationId:r.reservationId }); sentToTalk = true; }catch(_){}
+    }
     const d = new Date(S.date.replace(/-/g,'/'));
     const when = `${d.getMonth()+1}月${d.getDate()}日(${WEEK[d.getDay()]}) ${S.time}`;
     $('form').classList.add('hide'); $('bar').classList.add('hide');
     $('done').classList.remove('hide');
     $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名${kidsText()}・${S.seat}` + (r.oneHour?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, 60)}</b>（1時間）<br>1時間以内のご退席で1名様分のドリンクが無料になります</span>`
-      : r.limited?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）<br>ご協力をお願いいたします</span>`:'');
+      : r.limited?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）<br>ご協力をお願いいたします</span>`:'')
+      + (sentToTalk ? `<br><br><span class="note">ご予約内容をLINEのトークにお送りしました</span>` : '');
     window.scrollTo(0,0);
   }catch(e){
     alert(e.message);
