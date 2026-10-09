@@ -1,337 +1,433 @@
-<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ヤキニク セルン ご予約</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<style>
-  :root{--main:#ee7d1a;--main-d:#c9620a;--ink:#222;--sub:#777;--line:#e6e6e6;--bg:#fff8f1;--ng:#bbb}
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  body{margin:0;font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}
-  header{background:var(--main);color:#fff;padding:16px;text-align:center}
-  header h1{margin:0;font-size:20px;letter-spacing:.05em}
-  header p{margin:4px 0 0;font-size:12px;opacity:.9}
-  main{padding:12px 16px 120px;max-width:480px;margin:0 auto}
-  .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-  .card h2{margin:0 0 10px;font-size:15px}
-  .card h2 small{font-weight:normal;color:var(--sub);font-size:12px;margin-left:6px}
-  .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .cal-head button{border:0;background:none;font-size:20px;color:var(--main);padding:4px 10px}
-  .cal-head button:disabled{color:var(--ng)}
-  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
-  .cal .w{font-size:11px;color:var(--sub)}
-  .cal .w.sun,.cal .d.sun{color:#d33}.cal .w.sat,.cal .d.sat{color:#2a6fd1}
-  .cal .d{padding:9px 0;border-radius:8px;font-size:14px;border:1px solid transparent}
-  .cal .d.ok{background:#fff3e6;cursor:pointer}
-  .cal .d.off{color:var(--ng)!important;background:#f5f5f5}
-  .cal .d.closed{color:var(--ng)!important;background:#f5f5f5;text-decoration:line-through}
-  .cal .d.sel{background:var(--main);color:#fff!important}
-  .grid{display:grid;gap:8px}
-  .g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g6{grid-template-columns:repeat(6,1fr)}
-  .opt{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 0;font-size:14px;text-align:center;cursor:pointer;color:var(--ink)}
-  .opt.sel{background:var(--main);border-color:var(--main);color:#fff;font-weight:bold}
-  .note{font-size:12px;color:var(--sub);margin-top:8px}
-  .warn{background:#fff3e6;border-left:4px solid var(--main);padding:10px;border-radius:6px;font-size:13px;margin-top:10px}
-  label{display:block;font-size:13px;margin:8px 0 4px}
-  input,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;font-family:inherit}
-  textarea{height:70px}
-  .hello{font-size:15px}
-  .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -2px 8px rgba(0,0,0,.08)}
-  .bar .sum{font-size:12px;color:var(--sub);text-align:center;margin-bottom:6px;min-height:16px}
-  .btn{display:block;width:100%;max-width:480px;margin:0 auto;border:0;border-radius:24px;padding:14px;font-size:16px;font-weight:bold;background:var(--main);color:#fff}
-  .btn:disabled{background:var(--ng)}
-  .center{text-align:center;padding:40px 16px}
-  .done h2{color:var(--main)}
-  .tel{color:var(--main);font-weight:bold}
-  .kid{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
-  .kid:last-of-type{border-bottom:0}
-  .kid span small{display:block;color:var(--sub);font-size:11px}
-  .step{display:flex;align-items:center;gap:12px}
-  .step button{width:36px;height:36px;border-radius:50%;border:1px solid var(--main);background:#fff;color:var(--main);font-size:20px;line-height:1}
-  .step button:disabled{border-color:var(--line);color:var(--ng)}
-  .step b{min-width:20px;text-align:center;font-size:16px}
-  .hide{display:none!important}
-</style>
-</head>
-<body>
-<header>
-  <h1>ヤキニク セルン</h1>
-  <p>LINEかんたん予約</p>
-</header>
-
-<div id="loading" class="center">読み込み中…</div>
-<div id="error" class="center hide"></div>
-
-<main id="form" class="hide">
-  <div class="card">
-    <h2>ご来店日<small>2日前まで受付</small></h2>
-    <div class="cal-head">
-      <button id="prev">‹</button><b id="month"></b><button id="next">›</button>
-    </div>
-    <div class="cal" id="cal"></div>
-    <div id="weekendNote" class="warn hide"></div>
-    <div class="note">前日・当日のご予約は<span class="tel js-tel">お電話</span>でお願いします</div>
-  </div>
-
-  <div class="card">
-    <h2>時間</h2>
-    <div class="grid g4" id="slots"></div>
-    <div id="planBox" class="hide" style="margin-top:12px">
-      <div class="note" style="margin:0 0 6px">ご利用時間をお選びください</div>
-      <div class="grid" style="grid-template-columns:1fr" id="plan"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>人数</h2>
-    <div class="grid g6" id="people"></div>
-    <div class="note"><span id="maxP"></span>名以上のご予約は<span class="tel js-tel">お電話</span>でお願いします</div>
-  </div>
-
-  <div class="card">
-    <h2>お子様<small>上の人数のうち（いなければ0のまま）</small></h2>
-    <div class="kid"><span>小学校低学年</span><div class="step" data-k="kidsLow"><button>−</button><b>0</b><button>＋</button></div></div>
-    <div class="kid"><span>幼児<small>1歳〜未就学のお子様</small></span><div class="step" data-k="kidsInfant"><button>−</button><b>0</b><button>＋</button></div></div>
-    <div class="kid"><span>乳児<small>1歳未満</small></span><div class="step" data-k="kidsBaby"><button>−</button><b>0</b><button>＋</button></div></div>
-  </div>
-
-  <div class="card">
-    <h2>お席のご希望</h2>
-    <div class="grid g3" id="seat"></div>
-    <div class="note">ご希望に添えない場合もございます</div>
-  </div>
-
-  <div class="card" id="newUser">
-    <h2>お客様情報<small>初回のみ</small></h2>
-    <label>お名前</label>
-    <input id="name" autocomplete="name" placeholder="例）セルン 太郎">
-    <label>電話番号</label>
-    <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="例）09012345678">
-  </div>
-  <div class="card hide" id="knownUser"><div class="hello"><b id="knownName"></b> 様、いつもありがとうございます。</div></div>
-
-  <div class="card">
-    <h2>ご要望<small>任意</small></h2>
-    <textarea id="note" maxlength="200" placeholder="お子様連れ、記念日など"></textarea>
-  </div>
-</main>
-
-<div id="done" class="center done hide">
-  <h2>ご予約を受け付けました</h2>
-  <p id="doneText"></p>
-  <p class="note">変更・キャンセルは<span class="tel js-tel">お電話</span>でお願いします</p>
-  <button class="btn" id="closeBtn" style="margin-top:24px">閉じる</button>
-</div>
-
-<div class="bar hide" id="bar">
-  <div class="sum" id="sum"></div>
-  <button class="btn" id="submit" disabled>この内容で予約する</button>
-</div>
-
-<script>
-const LIFF_ID = '2011913050-f55WGZXV';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxUFZ-BWEUNmgomLOvinJuIaqZrqg_Tm8n4C6FuKO_lX2scaDYwS4eUrTwdBkEYmL5YKg/exec';
+/**
+ * セルン LINE予約 API（GAS）
+ * スプレッドシート「セルン予約台帳」にバインドして使う
+ */
+const SHEET_RES = '予約';
+const SHEET_CUS = '顧客';
+const SHEET_CFG = '設定';
+const HOLIDAY_CAL = 'ja.japanese#holiday@group.v.calendar.google.com';
+const TZ = 'Asia/Tokyo';
+const SHEET_SP = '土日祝扱い';
 const SHOP_TEL = '078-927-0021';
 
-const $ = id => document.getElementById(id);
-const WEEK = ['日','月','火','水','木','金','土'];
-const S = { date:null, time:null, people:null, seat:null, kidsLow:0, kidsInfant:0, kidsBaby:0, plan:'' };
-const kidsSum = () => S.kidsLow + S.kidsInfant + S.kidsBaby;
-function kidsText(){
-  const p = [];
-  if(S.kidsLow) p.push('小学低学年'+S.kidsLow);
-  if(S.kidsInfant) p.push('幼児'+S.kidsInfant);
-  if(S.kidsBaby) p.push('乳児'+S.kidsBaby);
-  return p.length ? '（うち '+p.join('・')+'）' : '';
-}
-function renderKids(){
-  const max = S.people ? S.people - 1 : 0;
-  // 人数を減らした時は子どもの数を合わせて減らす
-  ['kidsBaby','kidsInfant','kidsLow'].forEach(k=>{ while(kidsSum() > max && S[k] > 0) S[k]--; });
-  document.querySelectorAll('.step').forEach(el=>{
-    const k = el.dataset.k, [minus, plus] = el.querySelectorAll('button');
-    el.querySelector('b').textContent = S[k];
-    minus.disabled = S[k] <= 0;
-    plus.disabled = kidsSum() >= max;
-  });
-}
-let D = null, idToken = null, monthIdx = 0, months = [];
-
-// 送信ID：通信が不安定で再送しても予約が二重にならないようにする
-const REQUEST_ID = 'Q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-
-// Google側の一時的な失敗に備えて最大3回まで自動で再試行
-async function api(body){
-  let lastErr;
-  for(let i = 0; i < 3; i++){
-    try{
-      const r = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(Object.assign({idToken, requestId:REQUEST_ID}, body)) });
-      const t = await r.text();
-      let j;
-      try{ j = JSON.parse(t); }catch(_){ throw new Error('通信が混み合っています。少し待ってからもう一度お試しください'); }
-      if(!j.ok){ const e = new Error(j.error || 'エラーが発生しました'); e.app = true; throw e; }
-      return j;
-    }catch(e){
-      if(e.app) throw e;  // 入力内容のエラーは再試行しない
-      lastErr = e;
-      await new Promise(res => setTimeout(res, 1500 * (i + 1)));
+/** 初回だけ実行：シートと設定を作る */
+function setup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const make = (name, header) => {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    if (sh.getLastRow() === 0) {
+      sh.appendRow(header);
+      sh.setFrozenRows(1);
+      sh.getRange(1, 1, 1, header.length).setFontWeight('bold').setBackground('#f3f3f3');
     }
+    return sh;
+  };
+
+  const res = make(SHEET_RES, ['予約ID', '受付日時', '予約日', '時間', '人数', '席希望', '名前', '電話', 'LINEユーザーID', '備考', 'ステータス']);
+  res.getRange('B:D').setNumberFormat('@');
+  res.getRange('H:H').setNumberFormat('@');
+  res.getRange('K2:K').setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(['予約', '来店', 'キャンセル', '無断キャンセル']).build()
+  );
+
+  const cus = make(SHEET_CUS, ['LINEユーザーID', '名前', '電話', '初回予約日', '最終予約日', '予約回数']);
+  cus.getRange('C:E').setNumberFormat('@');
+
+  const cfg = make(SHEET_CFG, ['項目', '値', '説明']);
+  cfg.getRange('B:B').setNumberFormat('@');
+  if (cfg.getLastRow() === 1) {
+    cfg.getRange(2, 1, 8, 3).setValues([
+      ['受付開始', '17:00', '最初の予約枠（実際の時間に直す）'],
+      ['最終受付', '21:00', '最後の予約枠（実際の時間に直す）'],
+      ['刻み分', '30', '枠の間隔（分）'],
+      ['締切日数', '2', '何日前までネット予約OKか'],
+      ['予約可能日数', '60', '何日先まで受け付けるか'],
+      ['最大人数', '6', 'ネット予約の上限人数'],
+      ['休業日カレンダーID', '97535af815b73d359dbf78847f23e56026c42964dcf3581568a045bae65186d0@group.calendar.google.com', 'シフト管理と共用'],
+      ['土日祝の案内', '土日祝はお席のご利用時間を1〜1.5時間とさせていただきます', '土日祝の予約画面に自動表示'],
+    ]);
   }
-  throw lastErr;
+  cfg.autoResizeColumns(1, 3);
 }
 
-function showError(msg){
-  $('loading').classList.add('hide');
-  $('error').classList.remove('hide');
-  $('error').innerHTML = msg + (SHOP_TEL ? `<br><br>お電話：<a class="tel" href="tel:${SHOP_TEL}">${SHOP_TEL}</a>` : '');
+/** 動作確認用 */
+function doGet() {
+  return json_({ ok: true, msg: 'セルンLINE予約API 稼働中' });
 }
 
-function setTel(){
-  document.querySelectorAll('.js-tel').forEach(el=>{
-    if(SHOP_TEL){ el.innerHTML = `お電話（<a class="tel" href="tel:${SHOP_TEL}">${SHOP_TEL}</a>）`; }
-  });
-}
-
-function renderCal(){
-  const [y,m] = months[monthIdx];
-  $('month').textContent = `${y}年${m}月`;
-  $('prev').disabled = monthIdx===0;
-  $('next').disabled = monthIdx===months.length-1;
-  const map = {}; D.days.forEach(d=>map[d.date]=d);
-  const first = new Date(y,m-1,1), last = new Date(y,m,0).getDate();
-  let html = WEEK.map((w,i)=>`<div class="w ${i===0?'sun':i===6?'sat':''}">${w}</div>`).join('');
-  for(let i=0;i<first.getDay();i++) html += '<div></div>';
-  for(let d=1; d<=last; d++){
-    const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const info = map[key], dow = new Date(y,m-1,d).getDay();
-    let cls = 'd ' + (dow===0||(info&&info.holiday)?'sun':dow===6?'sat':'');
-    if(!info) cls += ' off'; else if(info.closed) cls += ' closed'; else cls += ' ok';
-    if(S.date===key) cls += ' sel';
-    html += `<div class="${cls}" data-date="${info&&!info.closed?key:''}">${d}</div>`;
+/** LIFF画面からの呼び出し口 */
+function doPost(e) {
+  try {
+    const req = JSON.parse(e.postData.contents);
+    const user = verify_(req.idToken); // なりすまし防止：LINEのIDトークンを検証
+    let result;
+    if (req.action === 'init') result = init_(user.sub);
+    else if (req.action === 'reserve') result = reserve_(user.sub, req);
+    else if (req.action === 'confirm') result = confirm_(user.sub, req);
+    else throw new Error('不明な操作です');
+    return json_(Object.assign({ ok: true }, result));
+  } catch (err) {
+    return json_({ ok: false, error: err.message });
   }
-  $('cal').innerHTML = html;
 }
 
-function opts(el, list, key, fmt){
-  el.innerHTML = list.map(v=>`<div class="opt" data-v="${v}">${fmt?fmt(v):v}</div>`).join('');
-  el.onclick = e=>{
-    const t = e.target.closest('.opt'); if(!t) return;
-    S[key] = isNaN(t.dataset.v) || key!=='people' ? t.dataset.v : Number(t.dataset.v);
-    [...el.children].forEach(c=>c.classList.toggle('sel', c===t));
-    update();
+/** 画面の初期表示データ */
+function init_(userId) {
+  const cfg = getConfig_();
+  const c = findCustomer_(userId);
+  return {
+    customer: c ? { name: c.name, phone: c.phone } : null,
+    days: calendarDays_(cfg),
+    slots: slots_(cfg),
+    maxPeople: cfg.maxPeople,
+    weekendNote: cfg.weekendNote,
+    limitMin: cfg.limitMin,
+    freeFrom: cfg.freeFrom,
+    drinkUntil: cfg.drinkUntil,
   };
 }
 
-function endTime(t, min){
-  const [hh, mm] = t.split(':').map(Number), e = hh*60 + mm + min;
-  return Math.floor(e/60) + ':' + String(e%60).padStart(2,'0');
-}
-const limitLabel = () => (D.limitMin/60) + '時間';
-const freeHour = () => Number((D.freeFrom||'19:00').split(':')[0]);
-const timeLimited = (day, t) => !!(day && day.limited && t && t < (D.freeFrom||'19:00'));
-const drinkOk = (day, t) => timeLimited(day, t) && t <= (D.drinkUntil||'18:30');
-const useMin = () => S.plan === '1h' ? 60 : D.limitMin;
-const useLabel = () => S.plan === '1h' ? '1時間' : limitLabel();
-function renderPlan(day){
-  const ok = drinkOk(day, S.time);
-  $('planBox').classList.toggle('hide', !ok);
-  if(!ok){ S.plan = ''; return; }
-  const items = [
-    { v:'', t:`${limitLabel()}（${S.time}〜${endTime(S.time, D.limitMin)}）` },
-    { v:'1h', t:`1時間でご退席（${S.time}〜${endTime(S.time, 60)}）<br><small>1名様分のドリンク無料</small>` },
-  ];
-  $('plan').innerHTML = items.map(i=>`<div class="opt ${S.plan===i.v?'sel':''}" data-p="${i.v}">${i.t}</div>`).join('');
-  $('plan').onclick = e=>{ const t=e.target.closest('.opt'); if(!t) return; S.plan=t.dataset.p; update(); };
-}
-function update(){
-  renderKids();
-  const day = S.date && D.days.find(d=>d.date===S.date);
-  $('weekendNote').classList.toggle('hide', !(day && day.limited));
-  const dk = (D.drinkUntil||'18:30');
-  const base = `土日祝はお席のご利用時間を<b>${limitLabel()}</b>でご協力をお願いしております。${freeHour()}時以降のご入店の場合、時間制限はございません。<br>🍺 ${dk}までのご入店で<b>1時間以内にご退席</b>いただくと、<b>1名様分のドリンクが無料</b>になります。`;
-  renderPlan(day);
-  $('weekendNote').innerHTML = !S.time ? base
-    : timeLimited(day, S.time) ? base + `<br>ご利用時間：<b>${S.time}〜${endTime(S.time, useMin())}</b>（${useLabel()}${S.plan==='1h'?'・ドリンク1杯サービス':'制'}）`
-    : `${freeHour()}時以降のご入店のため、<b>時間制限はございません</b>。`;
-  const parts = [];
-  if(S.date){ const d=new Date(S.date.replace(/-/g,'/')); parts.push(`${d.getMonth()+1}/${d.getDate()}(${WEEK[d.getDay()]})`); }
-  if(S.time) parts.push(timeLimited(day, S.time) ? `${S.time}〜${endTime(S.time, useMin())}（${useLabel()}${S.plan==='1h'?'・🍺サービス':'制'}）` : S.time);
-  if(S.people) parts.push(S.people+'名'+kidsText());
-  if(S.seat) parts.push(S.seat);
-  $('sum').textContent = parts.join(' ・ ');
-  const userOk = D.customer || ($('name').value.trim() && $('phone').value.replace(/\D/g,'').length>=10);
-  $('submit').disabled = !(S.date && S.time && S.people && S.seat && userOk);
-}
+/** 予約登録 */
+function reserve_(userId, req) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const cfg = getConfig_();
+    const days = calendarDays_(cfg);
 
-async function submit(){
-  const btn = $('submit');
-  btn.disabled = true; btn.textContent = '送信中…';
-  try{
-    const r = await api({ action:'reserve', date:S.date, time:S.time, people:S.people, seat:S.seat,
-      kidsLow:S.kidsLow, kidsInfant:S.kidsInfant, kidsBaby:S.kidsBaby, plan:S.plan,
-      name:$('name').value, phone:$('phone').value, note:$('note').value });
-    // 予約内容をLINEのトークに残す（トークから開いた時は無料で送れる。送れない時はお店から送る）
-    let sentToTalk = false;
-    if(r.confirmText && liff.isInClient()){
-      try{ await liff.sendMessages([{ type:'text', text:r.confirmText }]); sentToTalk = true; }catch(_){}
+    // 二重登録防止：同じ送信IDの予約がすでにあれば、その結果を返す
+    const rs = sheet_(SHEET_RES);
+    ensureHeaders_(rs);
+    if (req.requestId && rs.getLastRow() > 1) {
+      const v = rs.getRange(2, 1, rs.getLastRow() - 1, 12).getDisplayValues();
+      for (let i = v.length - 1; i >= 0; i--) {
+        if (v[i][11] === req.requestId) {
+          const dd = days.find(d => d.date === v[i][2]);
+          return { reservationId: v[i][0], name: v[i][6], limited: isLimited_(dd, v[i][3], cfg), weekendNote: cfg.weekendNote, limitMin: cfg.limitMin };
+        }
+      }
     }
-    if(!sentToTalk){
-      try{ await api({ action:'confirm', reservationId:r.reservationId }); sentToTalk = true; }catch(_){}
+
+    const day = days.find(d => d.date === req.date);
+    if (!day) throw new Error('この日はネット予約の受付期間外です。お電話でお願いします');
+    if (day.closed) throw new Error('この日は休業日です');
+    if (slots_(cfg).indexOf(req.time) < 0) throw new Error('時間が正しくありません');
+
+    const n = Number(req.people);
+    if (!(n >= 1 && n <= cfg.maxPeople)) throw new Error(cfg.maxPeople + '名を超える場合はお電話でお願いします');
+    if (['座敷', 'イス', '希望なし'].indexOf(req.seat) < 0) throw new Error('席の希望を選んでください');
+
+    // お子様の内訳（合計人数に含む）
+    const kid = x => { const k = Math.floor(Number(x) || 0); return k > 0 ? k : 0; };
+    const kLow = kid(req.kidsLow), kInf = kid(req.kidsInfant), kBaby = kid(req.kidsBaby);
+    if (kLow + kInf + kBaby > n - 1) throw new Error('お子様の人数が合計人数を超えています（大人の方1名以上）');
+
+    // 1時間プラン（土日祝・ドリンクサービスの時間までの入店のみ）
+    const limited = isLimited_(day, req.time, cfg);
+    const oneHour = req.plan === '1h' && limited && req.time <= cfg.drinkUntil;
+    const useMin = oneHour ? 60 : cfg.limitMin;
+
+    let c = findCustomer_(userId);
+    const name = clean_(toKana_(req.name));
+    const phone = String(req.phone || '').replace(/[^\d]/g, '');
+    if (!c && (!name || phone.length < 10)) throw new Error('お名前と電話番号を入力してください');
+    if (!c && !/^[ァ-ヺー・ 　]+$/.test(name)) throw new Error('お名前はカタカナで入力してください');
+
+    const now = new Date();
+    const cs = sheet_(SHEET_CUS);
+    if (!c) {
+      cs.appendRow([userId, name, "'" + phone, req.date, req.date, 1]);
+      c = { name: name, phone: phone };
+    } else {
+      cs.getRange(c.row, 5, 1, 2).setValues([[req.date, c.count + 1]]);
     }
-    const d = new Date(S.date.replace(/-/g,'/'));
-    const when = `${d.getMonth()+1}月${d.getDate()}日(${WEEK[d.getDay()]}) ${S.time}`;
-    $('form').classList.add('hide'); $('bar').classList.add('hide');
-    $('done').classList.remove('hide');
-    $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名${kidsText()}・${S.seat}` + (r.oneHour?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, 60)}</b>（1時間）<br>1時間以内のご退席で1名様分のドリンクが無料になります</span>`
-      : r.limited?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）<br>ご協力をお願いいたします</span>`:'')
-      + (sentToTalk ? `<br><br><span class="note">ご予約内容をLINEのトークにお送りしました</span>` : '');
-    window.scrollTo(0,0);
-  }catch(e){
-    alert(e.message);
-    btn.disabled = false; btn.textContent = 'この内容で予約する';
+
+    const id = 'R' + Utilities.formatDate(now, TZ, 'yyMMddHHmmss');
+    rs.appendRow([
+      id, Utilities.formatDate(now, TZ, 'yyyy-MM-dd HH:mm'), req.date, req.time, n, req.seat,
+      c.name, "'" + c.phone, userId, clean_(req.note).slice(0, 200), '予約', String(req.requestId || ''),
+      kLow, kInf, kBaby, oneHour ? '1時間・ドリンク1杯サービス' : '',
+    ]);
+
+    notify_(cfg, {
+      date: req.date, time: req.time, n: n, seat: req.seat, name: c.name, phone: c.phone,
+      kids: kidsText_(kLow, kInf, kBaby), note: clean_(req.note).slice(0, 200), limited: limited,
+      useMin: useMin, oneHour: oneHour,
+    });
+
+    const confirmText = confirmText_(cfg, {
+      date: req.date, time: req.time, n: n, seat: req.seat, name: c.name,
+      kids: kidsText_(kLow, kInf, kBaby), limited: limited, oneHour: oneHour,
+      note: clean_(req.note).slice(0, 200),
+    });
+
+    return { reservationId: id, name: c.name, limited: limited, oneHour: oneHour, useMin: useMin, weekendNote: cfg.weekendNote, limitMin: cfg.limitMin, confirmText: confirmText };
+  } finally {
+    lock.releaseLock();
   }
 }
 
-async function main(){
-  setTel();
-  try{
-    await liff.init({ liffId: LIFF_ID });
-    if(!liff.isLoggedIn()){ liff.login({ redirectUri: location.href }); return; }
-    idToken = liff.getIDToken();
-    D = await api({ action:'init' });
-  }catch(e){ showError('読み込みに失敗しました。<br>LINEアプリから開き直してください。<br><span class="note">'+e.message+'</span>'); return; }
-
-  const seen = new Set();
-  D.days.forEach(d=>{ const [y,m]=d.date.split('-').map(Number); const k=y+'-'+m; if(!seen.has(k)){seen.add(k); months.push([y,m]);} });
-  if(!months.length){ showError('現在ネット予約を受け付けていません。'); return; }
-  renderCal();
-  $('prev').onclick = ()=>{ monthIdx--; renderCal(); };
-  $('next').onclick = ()=>{ monthIdx++; renderCal(); };
-  $('cal').onclick = e=>{ const t=e.target.closest('.d'); if(!t||!t.dataset.date) return; S.date=t.dataset.date; renderCal(); update(); };
-
-  opts($('slots'), D.slots, 'time');
-  $('maxP').textContent = D.maxPeople + 1;
-  opts($('people'), Array.from({length:D.maxPeople},(_,i)=>i+1), 'people');
-  opts($('seat'), ['座敷','イス','希望なし'], 'seat');
-  document.querySelectorAll('.step').forEach(el=>{
-    const k = el.dataset.k, [minus, plus] = el.querySelectorAll('button');
-    minus.onclick = ()=>{ if(S[k]>0){ S[k]--; update(); } };
-    plus.onclick = ()=>{ if(S.people && kidsSum() < S.people-1){ S[k]++; update(); } };
+/** 予約シートの追加列の見出しを用意 */
+function ensureHeaders_(rs) {
+  const extra = ['送信ID', '小学低学年', '幼児', '乳児', 'プラン', '確認送信'];
+  const cur = rs.getRange(1, 12, 1, extra.length).getValues()[0];
+  extra.forEach((h, i) => {
+    if (cur[i] === '') rs.getRange(1, 12 + i).setValue(h).setFontWeight('bold').setBackground('#f3f3f3');
   });
-  renderKids();
-
-  if(D.customer){ $('newUser').classList.add('hide'); $('knownUser').classList.remove('hide'); $('knownName').textContent = D.customer.name; }
-  ['name','phone'].forEach(id=>$(id).addEventListener('input', update));
-  $('submit').onclick = submit;
-  $('closeBtn').onclick = ()=>{ if(liff.isInClient()) liff.closeWindow(); else window.close(); };
-
-  $('loading').classList.add('hide');
-  $('form').classList.remove('hide');
-  $('bar').classList.remove('hide');
 }
-main();
-</script>
-</body>
-</html>
+
+function isLimited_(day, time, cfg) {
+  return !!(day && day.limited && time < cfg.freeFrom);
+}
+
+function endTime_(t, min) {
+  const p = t.split(':').map(Number), e = p[0] * 60 + p[1] + min;
+  return Math.floor(e / 60) + ':' + ('0' + (e % 60)).slice(-2);
+}
+
+function kidsText_(low, inf, baby) {
+  const p = [];
+  if (low) p.push('小学低学年' + low);
+  if (inf) p.push('幼児' + inf);
+  if (baby) p.push('乳児' + baby);
+  return p.length ? '（うち ' + p.join('・') + '）' : '';
+}
+
+/** お客様向けの予約確認メッセージ（トークに残る控え） */
+function confirmText_(cfg, r) {
+  const W = ['日', '月', '火', '水', '木', '金', '土'];
+  const d = new Date(String(r.date).replace(/-/g, '/'));
+  const lines = [
+    '【ご予約内容】ヤキニク セルン',
+    '日時：' + (d.getMonth() + 1) + '/' + d.getDate() + '(' + W[d.getDay()] + ') ' + r.time,
+    '人数：' + r.n + '名' + r.kids,
+    'お席：' + r.seat,
+    'お名前：' + r.name + ' 様',
+  ];
+  if (r.note) lines.push('ご要望：' + String(r.note).replace(/^'/, ''));
+  if (r.oneHour) lines.push('ご利用時間：' + r.time + '〜' + endTime_(r.time, 60) + '（1時間・1名様分ドリンク無料）');
+  else if (r.limited) lines.push('ご利用時間：' + r.time + '〜' + endTime_(r.time, cfg.limitMin) + '（' + (cfg.limitMin / 60) + '時間制）');
+  lines.push('', '変更・キャンセルはお電話でお願いします', 'TEL ' + SHOP_TEL);
+  return lines.join('\n');
+}
+
+/** LINEのトーク画面から送れなかった時だけ、お店のアカウントから確認メッセージを送る（通数を消費） */
+function confirm_(userId, req) {
+  const rs = sheet_(SHEET_RES);
+  ensureHeaders_(rs);
+  const last = rs.getLastRow();
+  if (last < 2) throw new Error('予約が見つかりません');
+  const v = rs.getRange(2, 1, last - 1, 17).getDisplayValues();
+  for (let i = v.length - 1; i >= 0; i--) {
+    const r = v[i];
+    if (r[0] !== req.reservationId || r[8] !== userId) continue; // 本人の予約だけ
+    if (r[16]) return { sent: true };                              // 二重送信しない
+    const cfg = getConfig_();
+    const day = calendarDays_(cfg).find(dd => dd.date === r[2]);
+    const text = confirmText_(cfg, {
+      date: r[2], time: r[3], n: r[4], seat: r[5], name: r[6],
+      kids: kidsText_(Number(r[12]) || 0, Number(r[13]) || 0, Number(r[14]) || 0),
+      limited: isLimited_(day, r[3], cfg), oneHour: !!r[15], note: r[9],
+    });
+    pushText_(userId, text);
+    rs.getRange(i + 2, 17).setValue('送信済');
+    return { sent: true };
+  }
+  throw new Error('予約が見つかりません');
+}
+
+function pushText_(to, text) {
+  const token = PropertiesService.getScriptProperties().getProperty('LINE_ACCESS_TOKEN');
+  if (!token) throw new Error('トークン未設定');
+  const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + token },
+    payload: JSON.stringify({ to: to, messages: [{ type: 'text', text: text }] }),
+    muteHttpExceptions: true,
+  });
+  if (res.getResponseCode() !== 200) throw new Error('確認メッセージの送信に失敗しました');
+}
+
+/** お店のスマホのLINEに予約通知（失敗しても予約は成立させる。失敗時はメールで代わりに通知） */
+function notify_(cfg, r) {
+  const W = ['日', '月', '火', '水', '木', '金', '土'];
+  const d = new Date(r.date.replace(/-/g, '/'));
+  const lines = [
+    '🔔 新しいネット予約',
+    (d.getMonth() + 1) + '/' + d.getDate() + '(' + W[d.getDay()] + ') ' + r.time,
+    r.n + '名' + r.kids + '・' + r.seat,
+    r.name + ' 様　' + r.phone,
+  ];
+  if (r.note) lines.push('ご要望：' + r.note);
+  if (r.oneHour) lines.push('★1時間プラン ' + r.time + '〜' + endTime_(r.time, 60) + '（1名様分ドリンク無料）');
+  else if (r.limited) lines.push('※土日祝 ' + r.time + '〜' + endTime_(r.time, cfg.limitMin) + '（' + (cfg.limitMin / 60) + '時間制）');
+  const text = lines.join('\n');
+
+  const token = PropertiesService.getScriptProperties().getProperty('LINE_ACCESS_TOKEN');
+  try {
+    if (!token || !cfg.notifyTo) throw new Error('通知先またはトークン未設定');
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + token },
+      payload: JSON.stringify({ to: cfg.notifyTo, messages: [{ type: 'text', text: text }] }),
+      muteHttpExceptions: true,
+    });
+    console.log('LINE通知 結果: ' + res.getResponseCode() + ' ' + res.getContentText());
+    if (res.getResponseCode() !== 200) throw new Error('LINE通知エラー ' + res.getResponseCode() + ' ' + res.getContentText());
+  } catch (e) {
+    try {
+      MailApp.sendEmail(Session.getEffectiveUser().getEmail(), '【セルン予約】' + lines[1], text + '\n\n（LINE通知に失敗したためメールで送信：' + e.message + '）');
+    } catch (e2) {
+      console.error('通知失敗: ' + e.message + ' / ' + e2.message);
+    }
+  }
+}
+
+/** エディタから実行：お店のスマホにテスト通知を送って結果をログに出す */
+function testNotify() {
+  const cfg = getConfig_();
+  console.log('通知先ID: ' + (cfg.notifyTo || '（未設定）'));
+  console.log('トークン: ' + (PropertiesService.getScriptProperties().getProperty('LINE_ACCESS_TOKEN') ? 'あり' : '（未設定）'));
+  notify_(cfg, { date: fmt_(new Date()), time: '18:00', n: 2, seat: 'テスト', name: 'テスト通知', phone: '-', kids: '', note: '', limited: false });
+}
+
+/** 初回・機能追加時にエディタから1回実行：必要な権限をまとめて承認する */
+function authorize() {
+  MailApp.getRemainingDailyQuota();
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/info', {
+    headers: { Authorization: 'Bearer ' + PropertiesService.getScriptProperties().getProperty('LINE_ACCESS_TOKEN') },
+    muteHttpExceptions: true,
+  });
+  CalendarApp.getDefaultCalendar();
+  SpreadsheetApp.getActiveSpreadsheet();
+  console.log('承認OK');
+}
+
+/** 受付可能な日の一覧（休業日・土日祝フラグつき） */
+function calendarDays_(cfg) {
+  const today = new Date(Utilities.formatDate(new Date(), TZ, 'yyyy/MM/dd'));
+  const from = addDays_(today, cfg.leadDays);
+  const to = addDays_(today, cfg.rangeDays + 1);
+  const closed = collectDates_(cfg.calId, from, to, false);
+  const holiday = collectDates_(HOLIDAY_CAL, from, to, true);
+  specialDates_().forEach(k => holiday.add(k)); // お盆・年末年始など、自分で追加した日
+
+  const days = [];
+  for (let i = cfg.leadDays; i <= cfg.rangeDays; i++) {
+    const d = addDays_(today, i);
+    const key = fmt_(d);
+    const dow = d.getDay();
+    days.push({
+      date: key,
+      dow: dow,
+      closed: closed.has(key),
+      holiday: holiday.has(key),
+      limited: dow === 0 || dow === 6 || holiday.has(key),
+    });
+  }
+  return days;
+}
+
+/** 「土日祝扱い」シートのA列の日付を読む（無ければシートを作る） */
+function specialDates_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEET_SP);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_SP);
+    sh.getRange('A:A').setNumberFormat('yyyy-mm-dd');
+    sh.getRange(1, 1, 1, 2).setValues([['日付', 'メモ（お盆・年末年始など）']]).setFontWeight('bold').setBackground('#f3f3f3');
+    sh.setFrozenRows(1);
+    return [];
+  }
+  if (sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues()
+    .map(r => r[0]).filter(v => v instanceof Date).map(fmt_);
+}
+
+function collectDates_(calId, from, to, subscribeIfMissing) {
+  let cal = CalendarApp.getCalendarById(calId);
+  if (!cal && subscribeIfMissing) cal = CalendarApp.subscribeToCalendar(calId);
+  if (!cal) throw new Error('カレンダーが見つかりません: ' + calId);
+  const set = new Set();
+  cal.getEvents(from, to).forEach(ev => {
+    const d = new Date(ev.getStartTime());
+    const end = ev.getEndTime();
+    while (d < end) {
+      set.add(fmt_(d));
+      d.setDate(d.getDate() + 1);
+    }
+  });
+  return set;
+}
+
+function slots_(cfg) {
+  const toMin = s => { const p = s.split(':').map(Number); return p[0] * 60 + p[1]; };
+  const pad = x => ('0' + x).slice(-2);
+  const out = [];
+  for (let t = toMin(cfg.start); t <= toMin(cfg.last); t += cfg.step) {
+    out.push(pad(Math.floor(t / 60)) + ':' + pad(t % 60));
+  }
+  return out;
+}
+
+/** LINEのIDトークン検証 → sub(ユーザーID) を返す */
+function verify_(idToken) {
+  if (!idToken) throw new Error('LINEからアクセスしてください');
+  const channelId = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ID');
+  if (!channelId) throw new Error('LINE_CHANNEL_IDが未設定です');
+  const res = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/verify', {
+    method: 'post',
+    payload: { id_token: idToken, client_id: channelId },
+    muteHttpExceptions: true,
+  });
+  if (res.getResponseCode() !== 200) throw new Error('LINE認証に失敗しました。開き直してください');
+  return JSON.parse(res.getContentText());
+}
+
+function findCustomer_(userId) {
+  const v = sheet_(SHEET_CUS).getDataRange().getDisplayValues();
+  for (let i = 1; i < v.length; i++) {
+    if (v[i][0] === userId) return { row: i + 1, name: v[i][1], phone: v[i][2], count: Number(v[i][5]) || 0 };
+  }
+  return null;
+}
+
+function getConfig_() {
+  const c = {};
+  sheet_(SHEET_CFG).getDataRange().getDisplayValues().slice(1).forEach(r => { c[r[0]] = String(r[1]).trim(); });
+  return {
+    start: c['受付開始'],
+    last: c['最終受付'],
+    step: Number(c['刻み分']) || 30,
+    leadDays: Number(c['締切日数']) || 2,
+    rangeDays: Number(c['予約可能日数']) || 60,
+    maxPeople: Number(c['最大人数']) || 6,
+    calId: c['休業日カレンダーID'],
+    weekendNote: c['土日祝の案内'],
+    notifyTo: c['通知先ユーザーID'] || '',
+    limitMin: Number(c['土日祝の利用時間（分）']) || 90,
+    freeFrom: c['時間制限なしの入店時刻'] || '19:00',
+    drinkUntil: c['ドリンクサービスの入店時刻'] || '18:30',
+  };
+}
+
+/** getSheetByNameのサイレント失敗対策：無ければ必ずエラーにする */
+function sheet_(name) {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sh) throw new Error('シートが見つかりません: ' + name);
+  return sh;
+}
+
+function clean_(s) {
+  s = String(s || '').trim();
+  return /^[=+\-@]/.test(s) ? "'" + s : s; // 数式インジェクション対策
+}
+function toKana_(s) {
+  return String(s || '').replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60)).replace(/\s+/g, ' ').trim();
+}
+function addDays_(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function fmt_(d) { return Utilities.formatDate(d, TZ, 'yyyy-MM-dd'); }
+function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
