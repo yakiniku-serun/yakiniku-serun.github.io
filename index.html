@@ -52,6 +52,8 @@
   .step button:disabled{border-color:var(--line);color:var(--ng)}
   .step b{min-width:20px;text-align:center;font-size:16px}
   .hide{display:none!important}
+  .spin{width:36px;height:36px;margin:0 auto 14px;border:4px solid #fde2c8;border-top-color:var(--main);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -60,7 +62,11 @@
   <p>LINEかんたん予約</p>
 </header>
 
-<div id="loading" class="center">読み込み中…</div>
+<div id="loading" class="center">
+  <div class="spin"></div>
+  <div id="loadMsg">空き状況を確認しています…</div>
+  <div id="loadSub" class="note">数秒で表示されます</div>
+</div>
 <div id="error" class="center hide"></div>
 
 <main id="form" class="hide">
@@ -302,12 +308,14 @@ async function submit(){
 
 async function main(){
   setTel();
+  const slow = setTimeout(()=>{ $('loadSub').textContent = 'もうすぐ表示されます'; }, 6000);
   try{
     await liff.init({ liffId: LIFF_ID });
     if(!liff.isLoggedIn()){ liff.login({ redirectUri: location.href }); return; }
     idToken = liff.getIDToken();
     D = await api({ action:'init' });
   }catch(e){ showError('読み込みに失敗しました。<br>LINEアプリから開き直してください。<br><span class="note">'+e.message+'</span>'); return; }
+  finally{ clearTimeout(slow); }
 
   const seen = new Set();
   D.days.forEach(d=>{ const [y,m]=d.date.split('-').map(Number); const k=y+'-'+m; if(!seen.has(k)){seen.add(k); months.push([y,m]);} });
