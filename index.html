@@ -306,15 +306,32 @@ async function submit(){
   }
 }
 
+// ログインし直し（無限ループ防止で1回だけ）
+function relogin(){
+  try{
+    if(sessionStorage.getItem('serunRelogin')) return false;
+    sessionStorage.setItem('serunRelogin', '1');
+  }catch(_){ return false; }
+  try{ liff.logout(); }catch(_){}
+  liff.login({ redirectUri: location.href });
+  return true;
+}
+
 async function main(){
   setTel();
   const slow = setTimeout(()=>{ $('loadSub').textContent = 'もうすぐ表示されます'; }, 6000);
   try{
     await liff.init({ liffId: LIFF_ID });
     if(!liff.isLoggedIn()){ liff.login({ redirectUri: location.href }); return; }
+    // LINEアプリ以外（Googleマップ→ブラウザ等）で前回のログインが期限切れなら、自動でログインし直す
+    const dec = liff.getDecodedIDToken();
+    if(!liff.isInClient() && (!dec || dec.exp * 1000 < Date.now() + 120000) && relogin()) return;
     idToken = liff.getIDToken();
     D = await api({ action:'init' });
-  }catch(e){ showError('読み込みに失敗しました。<br>LINEアプリから開き直してください。<br><span class="note">'+e.message+'</span>'); return; }
+    try{ sessionStorage.removeItem('serunRelogin'); }catch(_){}
+  }catch(e){
+    if(/LINE認証/.test(e.message) && !liff.isInClient() && relogin()) return;
+    showError('読み込みに失敗しました。<br>LINEアプリから開き直してください。<br><span class="note">'+e.message+'</span>'); return; }
   finally{ clearTimeout(slow); }
 
   const seen = new Set();
