@@ -118,6 +118,13 @@
   </div>
   <div class="card hide" id="knownUser"><div class="hello"><b id="knownName"></b> 様、いつもありがとうございます。</div></div>
 
+  <div class="card hide" id="mailBox">
+    <h2>ご予約内容の受け取り<small>任意</small></h2>
+    <div class="note" style="margin:0 0 6px">LINEの友だち追加をされていない方は、ご予約内容をメールでお送りします</div>
+    <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="例）serun@example.com">
+    <div class="note hide" id="emailErr" style="color:#d33">メールアドレスをご確認ください</div>
+  </div>
+
   <div class="card">
     <h2>ご要望<small>任意</small></h2>
     <textarea id="note" maxlength="200" placeholder="お子様連れ、記念日など"></textarea>
@@ -140,6 +147,7 @@
 const LIFF_ID = '2011913050-f55WGZXV';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxUFZ-BWEUNmgomLOvinJuIaqZrqg_Tm8n4C6FuKO_lX2scaDYwS4eUrTwdBkEYmL5YKg/exec';
 const SHOP_TEL = '078-927-0021';
+const MAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const $ = id => document.getElementById(id);
 const WEEK = ['日','月','火','水','木','金','土'];
@@ -165,7 +173,7 @@ function renderKids(){
     plus.disabled = kidsSum() >= max;
   });
 }
-let D = null, idToken = null, monthIdx = 0, months = [];
+let D = null, idToken = null, monthIdx = 0, months = [], isFriend = true;
 
 // 送信ID：通信が不安定で再送しても予約が二重にならないようにする
 const REQUEST_ID = 'Q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -273,32 +281,39 @@ function update(){
   const nm = $('name').value.trim();
   const kanaOk = !nm || isKana(nm);
   $('nameErr').classList.toggle('hide', kanaOk);
+  const em = $('email').value.trim();
+  const mailOk = isFriend || !em || MAIL_RE.test(em);
+  $('emailErr').classList.toggle('hide', mailOk);
   const userOk = D.customer || (nm && kanaOk && $('phone').value.replace(/\D/g,'').length>=10);
-  $('submit').disabled = !(S.date && S.time && S.people && S.seat && userOk);
+  $('submit').disabled = !(S.date && S.time && S.people && S.seat && userOk && mailOk);
 }
 
 async function submit(){
   const btn = $('submit');
   btn.disabled = true; btn.textContent = '送信中…';
   try{
+    const email = isFriend ? '' : $('email').value.trim();
     const r = await api({ action:'reserve', date:S.date, time:S.time, people:S.people, seat:S.seat,
       kidsLow:S.kidsLow, kidsInfant:S.kidsInfant, kidsBaby:S.kidsBaby, plan:S.plan,
-      name:toKana($('name').value), phone:$('phone').value, note:$('note').value });
-    // 予約内容をLINEのトークに残す（トークから開いた時は無料で送れる。送れない時はお店から送る）
-    let sentToTalk = false;
-    if(r.confirmText && liff.isInClient()){
-      try{ await liff.sendMessages([{ type:'text', text:r.confirmText }]); sentToTalk = true; }catch(_){}
+      name:toKana($('name').value), phone:$('phone').value, note:$('note').value, email });
+    // 予約内容の控え：メール送信済みならそれで完了。それ以外はLINEのトーク→お店から送信の順で試す
+    let sent = r.mailed ? 'mail' : '';
+    if(!sent && r.confirmText && liff.isInClient()){
+      try{ await liff.sendMessages([{ type:'text', text:r.confirmText }]); sent = 'talk'; }catch(_){}
     }
-    if(!sentToTalk){
-      try{ await api({ action:'confirm', reservationId:r.reservationId }); sentToTalk = true; }catch(_){}
+    if(!sent && isFriend){
+      try{ await api({ action:'confirm', reservationId:r.reservationId }); sent = 'talk'; }catch(_){}
     }
     const d = new Date(S.date.replace(/-/g,'/'));
     const when = `${d.getMonth()+1}月${d.getDate()}日(${WEEK[d.getDay()]}) ${S.time}`;
     $('form').classList.add('hide'); $('bar').classList.add('hide');
     $('done').classList.remove('hide');
+    const sentMsg = sent === 'mail' ? `ご予約内容をメール（${email.replace(/[<>&"]/g,'')}）にお送りしました。<br>届かない場合は迷惑メールフォルダもご確認ください`
+      : sent === 'talk' ? 'ご予約内容をLINEのトークにお送りしました'
+      : 'この画面をスクリーンショットで保存してください';
     $('doneText').innerHTML = `${r.name} 様<br>${when}<br>${S.people}名${kidsText()}・${S.seat}` + (r.oneHour?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, 60)}</b>（1時間）<br>1時間以内のご退席で1名様分のドリンクが無料になります</span>`
       : r.limited?`<br><br><span class="note">ご利用時間：<b>${S.time}〜${endTime(S.time, D.limitMin)}</b>（${limitLabel()}制）<br>ご協力をお願いいたします</span>`:'')
-      + (sentToTalk ? `<br><br><span class="note">ご予約内容をLINEのトークにお送りしました</span>` : '');
+      + `<br><br><span class="note">${sentMsg}</span>`;
     window.scrollTo(0,0);
   }catch(e){
     alert(e.message);
@@ -327,7 +342,13 @@ async function main(){
     const dec = liff.getDecodedIDToken();
     if(!liff.isInClient() && (!dec || dec.exp * 1000 < Date.now() + 120000) && relogin()) return;
     idToken = liff.getIDToken();
-    D = await api({ action:'init' });
+    // 予約データの取得と、友だち追加済みかの確認を同時に行う
+    const [data, fr] = await Promise.all([
+      api({ action:'init' }),
+      liff.getFriendship().catch(()=>null),
+    ]);
+    D = data;
+    isFriend = !!(fr && fr.friendFlag);
     try{ sessionStorage.removeItem('serunRelogin'); }catch(_){}
   }catch(e){
     if(/LINE認証/.test(e.message) && !liff.isInClient() && relogin()) return;
@@ -354,7 +375,12 @@ async function main(){
   renderKids();
 
   if(D.customer){ $('newUser').classList.add('hide'); $('knownUser').classList.remove('hide'); $('knownName').textContent = D.customer.name; }
-  ['name','phone'].forEach(id=>$(id).addEventListener('input', update));
+  // 友だち追加していない方にだけメール欄を出す（前回のアドレスがあれば入れておく）
+  if(!isFriend){
+    $('mailBox').classList.remove('hide');
+    if(D.customer && D.customer.email) $('email').value = D.customer.email;
+  }
+  ['name','phone','email'].forEach(id=>$(id).addEventListener('input', update));
   // ひらがなで入力されたらカタカナに自動変換
   $('name').addEventListener('blur', ()=>{ $('name').value = toKana($('name').value); update(); });
   $('submit').onclick = submit;
