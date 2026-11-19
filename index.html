@@ -114,7 +114,7 @@
   <div class="card" id="newUser">
     <h2>お客様情報<small>初回のみ</small></h2>
     <label>お名前（ひらがな）</label>
-    <input id="name" autocomplete="name" placeholder="例）せるん たろう">
+    <div style="display:flex;gap:8px"><input id="sei" autocomplete="family-name" placeholder="せい（例：せるん）" style="flex:1;min-width:0"><input id="mei" autocomplete="given-name" placeholder="めい（例：たろう）" style="flex:1;min-width:0"></div><input id="name" type="hidden">
     <div class="note hide" id="nameErr" style="color:#d33">ひらがなで入力してください</div>
     <label>電話番号</label>
     <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="例）09012345678">
@@ -384,6 +384,9 @@ async function main(){
     if(D.customer && D.customer.email) $('email').value = D.customer.email;
   }
   ['name','phone','email'].forEach(id=>$(id).addEventListener('input', update));
+  // お名前は「せい」「めい」の2つの欄 → name（隠し）に「せい めい」でまとめる
+  const joinName = () => { $('name').value = (toKana($('sei').value) + ' ' + toKana($('mei').value)).trim(); };
+  ['sei','mei'].forEach(id => { $(id).addEventListener('input', () => { joinName(); update(); }); $(id).addEventListener('blur', () => { $(id).value = toKana($(id).value); joinName(); update(); }); });
   // カタカナで入力されたらひらがなに自動変換
   $('name').addEventListener('blur', ()=>{ $('name').value = toKana($('name').value); update(); });
   $('submit').onclick = submit;
